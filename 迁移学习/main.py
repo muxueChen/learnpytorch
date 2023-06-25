@@ -214,6 +214,7 @@ class Trainer(Tester):
         self.model.load(best_modes_wts)
         return self.model
 
+
 def test(model: Model, data: DataStore):
 
     data_iter = iter(data.validDataLoader)
