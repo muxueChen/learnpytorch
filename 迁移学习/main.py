@@ -26,7 +26,7 @@ class DataStore:
     _valid_dir = "./flower_data/valid"
     train_class_names = []
     vaild_class_names = []
-    batch_size = 2
+    batch_size = 8
     _cat_to_json = "cat_to_name.json"
     catdict = None
 
@@ -68,7 +68,7 @@ class Model:
     model: ResNet = None
     # 是否使用别人训练号的参数
     feature_extract = True
-
+    device: torch.device = None
     def __init__(self):
         self.model = models.resnet152(pretrained=True)
         if self.feature_extract:
@@ -91,10 +91,14 @@ class Model:
 
         return params
 
+    def is_available(self):
+        return torch.cuda.is_available()
+
     def load(self, state_dict):
         self.model.load_state_dict(state_dict=state_dict)
 
     def to(self, device: torch.device):
+        self.device = device
         self.model.to(device)
 
     def state_dict(self):
@@ -128,7 +132,6 @@ class Tester:
         epoch_acc = running_corrects / len(data.trainDataLoader.dataset)
 
         return running_loss, running_corrects
-
 
     def __call__(self, data: DataStore):
         return self.forward(data=data)
@@ -211,8 +214,30 @@ class Trainer(Tester):
         self.model.load(best_modes_wts)
         return self.model
 
+def test(model: Model, data: DataStore):
+
+    data_iter = iter(data.validDataLoader)
+    xd, yd = data_iter.__next__()
+
+    model.model.eval()
+    output = model(x=xd)
+
+    preds_tensor = torch.max(output, 1)[1]
+    preds = np.squeeze(preds_tensor.numpy()) if not model.is_available() else np.squeeze(preds_tensor.cpu().numpy())
+    return 0
+
+
 def main():
-    pass
+    model = Model()
+    trainer = Trainer(model=model)
+
+    data = DataStore()
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    train_on_gpu = torch.cuda.is_available()
+    model.to(device=device)
+    model = trainer(data=data)
+
+    test(model=model, data=data)
 
 
 if __name__ == '__main__':
